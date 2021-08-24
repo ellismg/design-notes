@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the strategy for generating and evolving Azure SDKs which use *protocol methods* a new feature we are introducing. 
+This document outlines the strategy for generating and evolving Azure SDKs which use *protocol methods* a new feature we are introducing.
 
 ### Protocol Methods
 
@@ -57,7 +57,7 @@ Protocol methods do not inspect the body of a request so any changes the service
 
 #### Adding New Optional Parameters
 
-Since optional parameters (which do not appear in the body) are emitted as formal parameters on the operation method, the introduction of a new optional parameter from the service does impact the generated SDK. As a motivating example, let's consider how the `GetPtesByName` shown above evolves when a new optional parameter, `species` is added, which allows filtering of pets returned by the operation.
+Since optional parameters (which do not appear in the body) are emitted as formal parameters on the operation method, the introduction of a new optional parameter from the service does impact the generated SDK. As a motivating example, let's consider how the `GetPetsByName` shown above evolves when a new optional parameter, `species` is added, which allows filtering of pets returned by the operation.
 
 Recall that in V1 of the SDK, we have the following:
 
@@ -75,7 +75,7 @@ public virtual Response GetPetsByName(string petName, string sort, int? limit, i
 public virtual Response GetPetsByName(string petName, string sort = "ASC", int? limit = 20, int? skip = 0, string species = null, RequestOptions requestOptions = default);
 ```
 
-We can use this strategy to add new optional parameters to methods.  Note that since the parameter of a method is always of type `RequestOptions` we can not run into an issue where the new overload creates an ambiguity between different overloads.
+We can use this strategy to add new optional parameters to methods.  Note that since the last parameter of a method is always of type `RequestOptions` we cannot run into an issue where the new overload creates an ambiguity between different overloads.
 
 The only downside of this approach is the number of overloads in the method group continues to grow and it make be hard to understand which is the "core method" and which overloads which simply delegate to this core method.  One strategy we are considering is that the first time we add new optional parameters to a method, we instead add an overload like the following:
 
@@ -87,11 +87,11 @@ public virtual Response GetPetsByName(string petName, string sort, int? limit, i
 public virtual Response GetPetsByName(string petName, RequestParameters parameters, RequestOptions requestOptions = default);
 ```
 
-This design is predicated on a new `RequestParameters` type, added to Azure Core, which is a property bag mapping string names to values. Logically, this type is similar to `Dictionary<string, object>` but it optimized for holding a small number of key value pairs.
+This design is predicated on a new `RequestParameters` type, added to Azure Core, which is a property bag mapping string names to values. Logically, this type is similar to `Dictionary<string, object>` but is optimized for holding a small number of key value pairs.
 
 Note that the `RequestParameters` type is not specific to a specific operation, which means it will not have members that correspond to parameters for the operation and so developers will have to depend on documentation to understand the properties the service supports and their names as well as their types.
 
-*(N.B: We have not closed on which of the two strategies we will employ, and the `RequestParameters` strategy would require some work in Azure Core, fortunately, we can start with the first strategy of just adding overloads with more and more optional parameters and then cut over to the new plan if we are comfortable with it)*
+*(N.B: We have not closed on which of the two strategies we will employ, and the `RequestParameters` strategy would require some work in Azure Core, fortunately, we can start with the first strategy of just adding overloads with more and more optional parameters and then cut over to the new plan if we are comfortable with it.)*
 
 ### Developer Driven Evolution
 
@@ -103,16 +103,16 @@ public virtual Response GetPet(string id, RequestOptions requestOptions = defaul
 public virtual Response CreateOrUpdatePet(string id, RequestContent body, RequestOptions requestOptions = default);
 
 // Hand authored overloads
-public virtual Response<Pet> GetPet(string id, CancellationToken cacellationToken = default);
-public virtual Response CreateOrUpdatePet(string id, Pet pet, CancellationToken cacellationToken = default);
+public virtual Response<Pet> GetPet(string id, CancellationToken cancellationToken = default);
+public virtual Response CreateOrUpdatePet(string id, Pet pet, CancellationToken cancellationToken = default);
 ```
 
-The evolution pattern here is to replace `RequestOptions` with `CancellationToken` in method signature, replace `RequestConent` with a model type that represents the body of the operation and to use `Response<T>` with a model type for operations which return values.
+The evolution pattern here is to replace `RequestOptions` with `CancellationToken` in method signature, replace `RequestContent` with a model type that represents the body of the operation and to use `Response<T>` with a model type for operations which return values.
 
-These additions can not impact binary compatibility (as the old overloads remain) and by changing `RequestOptions` to `CancellationToken` we ensure that a hand authored method would never have the same signature as an existing protocol method.  The use of optional parameters does mean the following can introduce source breaking changes for methods which do not take a body. For example, consider the following code, written using a protocol method:
+These additions cannot impact binary compatibility (as the old overloads remain) and by changing `RequestOptions` to `CancellationToken` we ensure that a hand authored method would never have the same signature as an existing protocol method.  The use of optional parameters does mean the following can introduce source breaking changes for methods which do not take a body. For example, consider the following code, written using a protocol method:
 
 ```C#
-Response r = client.GetPet("ABC123");  // <- now ambigous between GetPet(string, RequestOptions) and GetPet(string, CancellationToken)
+Response r = client.GetPet("ABC123");  // <- now ambiguous between GetPet(string, RequestOptions) and GetPet(string, CancellationToken)
 string petName = JsonDocument.Parse(r.Content).Root.GetProperty("name").GetString();
 ```
 
